@@ -42,6 +42,7 @@ Status TensorQueue::AddToTensorQueueMulti(std::vector<TensorTableEntry>& entries
     if (tensor_table_.find(entries[i].tensor_name) != tensor_table_.end()) {
       return DUPLICATE_NAME_ERROR;
     }
+    LOG(ERROR, messages[i].request_rank()) << "AddToTensorQueueMulti: " << messages[i].tensor_name();
     tensor_table_.emplace(entries[i].tensor_name, std::move(entries[i]));
     message_queue_.push(std::move(messages[i]));
   }
@@ -93,6 +94,7 @@ void TensorQueue::GetTensorEntriesFromResponse(
     std::lock_guard<std::mutex> guard(mutex_);
     int64_t i = 0;
     for (auto& name : response.tensor_names()) {
+      LOG(ERROR) << "GetTensorEntriesFromResponse: " << name;
       assert(response.response_type() == Response::ALLREDUCE ||
              response.response_type() == Response::ALLGATHER ||
              response.response_type() == Response::BROADCAST ||

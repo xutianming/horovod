@@ -312,10 +312,20 @@ void PerformOperation(Response response, HorovodGlobalState& state) {
     }
   }
 
+  for (auto& e : entries) {
+    LOG(ERROR) << "Rank: " << horovod_global.controller->GetRank()
+               << " Perform Operation: " << e.tensor_name;
+  }
+
   Status status;
   try {
+    LOG(ERROR) << "Rank: " << horovod_global.controller->GetRank()
+               << " Start to ExecuteOperation: " << entries[0].tensor_name;
     status = op_manager->ExecuteOperation(entries, response);
+    LOG(ERROR) << "Rank: " << horovod_global.controller->GetRank()
+               << " Finish ExecuteOperation: " << entries[0].tensor_name;
   } catch (const std::exception& ex) {
+    LOG(ERROR, horovod_global.controller->GetRank()) << "ExecuteOperation Failed";
     LOG(DEBUG, horovod_global.controller->GetRank()) << "ExecuteOperation Failed";
     status = Status::UnknownError(ex.what());
   }
@@ -543,7 +553,7 @@ void BackgroundThreadLoop(HorovodGlobalState& state) {
   try {
     while (RunLoopOnce(state));
   } catch (const std::exception& ex) {
-    LOG(ERROR) << "Horovod background loop uncaught exception: " << ex.what();
+    LOG(ERROR, horovod_global.controller->GetRank()) << "Horovod background loop uncaught exception: " << ex.what();
   }
 
     // Finalize all contexts
@@ -600,9 +610,10 @@ bool RunLoopOnce(HorovodGlobalState& state) {
     // Mark start of the new cycle.
     state.timeline.MarkCycleStart();
   }
-
+  // LOG(ERROR, state.controller->GetRank()) << "Try to ComputeResponseList ";
   auto response_list =
       state.controller->ComputeResponseList(horovod_global.shut_down, state);
+  // LOG(ERROR, state.controller->GetRank()) << "ComputeResponseList Finish size: " << response_list.responses().size();
 
   state.mark_cycles_in_timeline =
       state.controller->MarkCyclesInTimelinePending();
@@ -618,18 +629,28 @@ bool RunLoopOnce(HorovodGlobalState& state) {
   // Perform the collective operation. All nodes should end up performing
   // the same operation.
   int rank = state.controller->GetRank();
+  // LOG(TRACE, rank) << "=====>Response List Size " << response_list.responses().size() << std::endl;
   for (auto& response : response_list.responses()) {
+    LOG(ERROR, rank) << "Try to Perform " << response.tensor_names_string();
     if (!state.group_table.empty()) {
       // Deregister any completed groups
       state.group_table.DeregisterGroups(response.tensor_names());
     }
-
+    LOG(ERROR, rank) << "Performing " << response.tensor_names_string();
     LOG(TRACE, rank) << "Performing " << response.tensor_names_string();
     LOG(TRACE, rank) << "Processing " << response.tensor_names().size()
                      << " tensors";
     PerformOperation(response, horovod_global);
     LOG(TRACE, rank) << "Finished performing "
                      << response.tensor_names_string();
+    LOG(ERROR, rank) << "Finished performing "
+                     << response.tensor_names_string();
+    if (response.tensor_names_string().compare("HorovodAlltoall_Identity_0") == 0) {
+      state.controller->SetToAllReduce(true);
+      LOG(ERROR, rank) << "Set to allreduce to true";
+    } else {
+      std::cout << "Compare Failed : " << response.tensor_names_string() << std::endl;
+    }
   }
 
   if (state.parameter_manager.IsAutoTuning()) {

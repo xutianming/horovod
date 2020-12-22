@@ -16,6 +16,7 @@
 // =============================================================================
 
 #include "operation_manager.h"
+#include <iostream>
 
 namespace horovod {
 namespace common {
@@ -39,6 +40,7 @@ OperationManager::OperationManager(ParameterManager* param_manager,
 
 Status OperationManager::ExecuteAllreduce(std::vector<TensorTableEntry>& entries,
                                           const Response& response) const {
+  std::cout << "ExecuteAllReduce: " << entries[0].tensor_name << std::endl;
   for (auto& op : allreduce_ops_) {
     if (op->Enabled(*param_manager_, entries, response)) {
       return op->Execute(entries, response);

@@ -134,6 +134,7 @@ public:
   bool MarkCyclesInTimelinePending();
   void SynchronizeTimelineEnabled();
   StallInspector& GetStallInspector() { return stall_inspector_; };
+  void SetToAllReduce(bool to_allreduce) { to_allreduce_ = to_allreduce; }
 
 protected:
   // Functions must be overridden by concrete controller
@@ -186,6 +187,7 @@ protected:
   int cross_size_ = 1;
   bool is_coordinator_ = false;
   bool is_homogeneous_ = false;
+  bool to_allreduce_ = false;
 
   // ranks of the horovod world
   std::vector<int> ranks_;
