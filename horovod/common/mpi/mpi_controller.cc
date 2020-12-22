@@ -149,26 +149,6 @@ void MPIController::RecvReadyTensors(std::vector<std::string>& ready_to_reduce,
   delete[] displcmnts;
   delete[] buffer;
 
-  /**
-  ready_list.emplace_back();
-  for (int i = 1; i < size_; ++i) {
-    RequestList received_message_list;
-    Request request;
-    request.set_request_rank(obj->request_rank());
-    request.set_request_type((Request::RequestType) obj->request_type());
-    request.set_tensor_type((DataType) obj->tensor_type());
-    request.set_tensor_name(obj->tensor_name()->str());
-    request.set_root_rank(obj->root_rank());
-    request.set_device(obj->device());
-    request.set_tensor_shape(std::vector<int64_t>(obj->tensor_shape()->begin(),
-                                                  obj->tensor_shape()->end()));
-    request.set_prescale_factor(obj->prescale_factor());
-    request.set_postscale_factor(obj->postscale_factor());
-    received_message_list.emplace_request(std::move(request));
-    //request_list.set_shutdown(obj->shutdown());
-    ready_list.push_back(std::move(received_message_list));
-  }
-  */
 }
 
 void MPIController::SendFinalTensors(ResponseList& response_list) {

@@ -298,24 +298,7 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
       }
 
       // Receive ready tensors from other ranks
-      // (tmxu) Removed
-      // std::vector<RequestList> ready_list;
-      //if (ready_to_reduce.size() > 0) {
-      //  std::cout << "=======>ReadyToReduce " << std::endl;
-      //}
-      //for (std::string name : ready_to_reduce) {
-      //  std::cout << " Local Rank: " << local_rank_ << " TensorName: " << name << std::endl;
-      //}
-      // std::cout << "=========> Type: " << type << std::endl;
-      //if (! to_allreduce_) {
-        RecvReadyTensors(ready_to_reduce, ready_list);
-      //} else {
-        // std::cout << "Local Rank: " << local_rank_  << " AllReduce type, do not RecvReadyTensors : " << fake_allreduce_ready_list.size() << std::endl;
-      //}
-      //
-      //if (ready_list.size() > 2) {
-      //  LOG(ERROR) << "Ready List: " << ready_list.size();
-      //}
+      RecvReadyTensors(ready_to_reduce, ready_list);
 
       // (tmxu) Merge negotiated ready_list and 
       //if (to_allreduce_) {
@@ -335,9 +318,7 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
         auto received_message_list = ready_list[i];
         for (auto& received_message : received_message_list.requests()) {
           auto& received_name = received_message.tensor_name();
-          //if (to_allreduce_) {
-          //  LOG(ERROR, local_rank_) << "received_name: " << received_name;
-          //}
+
           if (received_message.request_type() == Request::JOIN) {
             state.joined_size++;
             continue;
@@ -479,27 +460,14 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
       message_list.set_shutdown(should_shut_down);
       while (!message_queue_tmp.empty()) {
         if (message_queue_tmp.front().request_type() == Request::ALLREDUCE) {
-          std::cout << "~~~LOCAL Rank: " << local_rank_ << " ~~ ALLReduce Skip SendReadyTensors : " << message_queue_tmp.front().tensor_name() << std::endl;
+          // Do nothing
         } else {
-          std::cout << "~~~LOCAL Rank: " << local_rank_ << " ~~ ALLReduce Perform SendReadyTensors : " << message_queue_tmp.front().tensor_name() << std::endl;
           message_list.add_request(message_queue_tmp.front());
         }
         message_queue_tmp.pop_front();
       }
       // Send ready tensors to rank zero
-      
-      //if (!is_allreduce) {
-      //  for (Request req : message_list.requests()) {
-      //    std::cout << "==========>SendReadyTensors Local Rank: " << local_rank_ << " Req: " << req.tensor_name() << std::endl;
-      //  }
-        SendReadyTensors(message_list);
-      //} else {
-        // std::cout << "Local Rank: " << local_rank_ << " AllReduce type, do not SendReadyTensors" << std::endl;
-        //  for (Request req : message_list.requests()) {
-        //    std::cout << "==========>Current Messages Local Rank: " << local_rank_ << " Req: " << req.tensor_name() << std::endl;
-        // }
-      //}
-
+      SendReadyTensors(message_list);
       // Receive final tensors to be processed from rank zero
       RecvFinalTensors(response_list);
     }
@@ -511,7 +479,6 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
       tensors_ready += r.tensor_names_string() + "; ";
     }
     LOG(TRACE) << "Sending ready responses as " << tensors_ready;
-    LOG(ERROR) << "Sending ready responses as " << tensors_ready;
   }
 
   // If need_communication is false, meaning no uncached message coming in,
@@ -1036,11 +1003,9 @@ bool Controller::IncrementTensorCount(const Request& msg, int joined_size) {
     messages.reserve(static_cast<unsigned long>(size_));
     message_table_.emplace(name, std::move(messages));
     table_iter = message_table_.find(name);
-    std::cout << "IncrementTensorCount NegotiateStart =============> Local rank " << local_rank_ << " " << name << " Request Rank: " << msg.request_rank() << std::endl;
     timeline_.NegotiateStart(name, msg.request_type());
   } else {
     std::vector<Request>& messages = table_iter->second;
-    std::cout << "IncrementTensorCount PlusOne =============> Local rank " << local_rank_ << " " << name << " Request Rank: " << msg.request_rank() << std::endl;
     messages.push_back(msg);
   }
 
@@ -1050,10 +1015,7 @@ bool Controller::IncrementTensorCount(const Request& msg, int joined_size) {
   int count = (int)messages.size();
   bool ready_to_reduce = count == (size_ - joined_size);
   if (ready_to_reduce) {
-    std::cout << "IncrementTensorCount NegotiateEnd =============> Local rank " << local_rank_ << " " << name << std::endl;
     timeline_.NegotiateEnd(name);
-  } else {
-    std::cout << "IncrementTensorCount Keep Negotiating Local rank " << local_rank_ << " " << name << std::endl;
   }
   return ready_to_reduce;
 }
