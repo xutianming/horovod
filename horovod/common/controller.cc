@@ -276,6 +276,7 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
         if (reduce) {
           ready_to_reduce.push_back(message.tensor_name());
         }
+
         if (message.request_type() == Request::ALLREDUCE) {
           LOG(ERROR, local_rank_) << "Create Fake Message";
           for (int i = 1; i < size_; ++i) {
@@ -293,6 +294,7 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
             fake_allreduce_ready_list[i].emplace_request(std::move(request));
           }
         }
+
       }
 
       // Receive ready tensors from other ranks
@@ -305,23 +307,27 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
       //  std::cout << " Local Rank: " << local_rank_ << " TensorName: " << name << std::endl;
       //}
       // std::cout << "=========> Type: " << type << std::endl;
-      if (! to_allreduce_) {
+      //if (! to_allreduce_) {
         RecvReadyTensors(ready_to_reduce, ready_list);
-      } else {
+      //} else {
         // std::cout << "Local Rank: " << local_rank_  << " AllReduce type, do not RecvReadyTensors : " << fake_allreduce_ready_list.size() << std::endl;
-      }
+      //}
+      //
+      //if (ready_list.size() > 2) {
+      //  LOG(ERROR) << "Ready List: " << ready_list.size();
+      //}
 
-      if (ready_list.size() > 2) {
-        LOG(ERROR) << "Ready List: " << ready_list.size();
-      }
-
-      if (to_allreduce_) {
+      // (tmxu) Merge negotiated ready_list and 
+      //if (to_allreduce_) {
         // (tmxu) append fake messages
-        ready_list.emplace_back();
+      //  ready_list.emplace_back();
         for (int i = 1; i < size_; ++i) {
-            ready_list.push_back(std::move(fake_allreduce_ready_list[i]));
+          for (Request req : fake_allreduce_ready_list[i].requests()) {
+            ready_list[i].emplace_request(std::move(req));
+          }
+          // ready_list.push_back(std::move(fake_allreduce_ready_list[i]));
         }
-      }
+      //}
 
       // Process messages.
       for (int i = 1; i < size_; ++i) {
@@ -329,9 +335,9 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
         auto received_message_list = ready_list[i];
         for (auto& received_message : received_message_list.requests()) {
           auto& received_name = received_message.tensor_name();
-          if (to_allreduce_) {
-            LOG(ERROR, local_rank_) << "received_name: " << received_name;
-          }
+          //if (to_allreduce_) {
+          //  LOG(ERROR, local_rank_) << "received_name: " << received_name;
+          //}
           if (received_message.request_type() == Request::JOIN) {
             state.joined_size++;
             continue;
@@ -459,29 +465,40 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
       response_list.set_shutdown(should_shut_down);
 
       // Broadcast final results to other ranks.
+      if (response_list.responses().size() > 0) {
+        std::cout << " ===========>SendFinalTensors Local Rank: " << local_rank_ << std::endl;
+        for (Response resp : response_list.responses()) {
+          std::cout << " SendFinalTensors" << resp.tensor_names_string() << std::endl;
+        }
+      }
+
       SendFinalTensors(response_list);
 
     } else {
       RequestList message_list;
       message_list.set_shutdown(should_shut_down);
-      bool is_allreduce = false;
       while (!message_queue_tmp.empty()) {
         if (message_queue_tmp.front().request_type() == Request::ALLREDUCE) {
-          is_allreduce = true;
+          std::cout << "~~~LOCAL Rank: " << local_rank_ << " ~~ ALLReduce Skip SendReadyTensors : " << message_queue_tmp.front().tensor_name() << std::endl;
+        } else {
+          std::cout << "~~~LOCAL Rank: " << local_rank_ << " ~~ ALLReduce Perform SendReadyTensors : " << message_queue_tmp.front().tensor_name() << std::endl;
+          message_list.add_request(message_queue_tmp.front());
         }
-        message_list.add_request(message_queue_tmp.front());
         message_queue_tmp.pop_front();
       }
       // Send ready tensors to rank zero
       
-      if (!is_allreduce) {
+      //if (!is_allreduce) {
+      //  for (Request req : message_list.requests()) {
+      //    std::cout << "==========>SendReadyTensors Local Rank: " << local_rank_ << " Req: " << req.tensor_name() << std::endl;
+      //  }
         SendReadyTensors(message_list);
-      } else {
-        std::cout << "Local Rank: " << local_rank_ << " AllReduce type, do not SendReadyTensors" << std::endl;
-        for (Request req : message_list.requests()) {
-          std::cout << "==========>Current Messages Local Rank: " << local_rank_ << " Req: " << req.tensor_name() << std::endl;
-        }
-      }
+      //} else {
+        // std::cout << "Local Rank: " << local_rank_ << " AllReduce type, do not SendReadyTensors" << std::endl;
+        //  for (Request req : message_list.requests()) {
+        //    std::cout << "==========>Current Messages Local Rank: " << local_rank_ << " Req: " << req.tensor_name() << std::endl;
+        // }
+      //}
 
       // Receive final tensors to be processed from rank zero
       RecvFinalTensors(response_list);

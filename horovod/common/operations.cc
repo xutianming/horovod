@@ -335,6 +335,7 @@ void PerformOperation(Response response, HorovodGlobalState& state) {
       timeline.End(e.tensor_name, status.ok() ? e.output : nullptr);
       // Callback can be null if the rank sent Join request.
       if (e.callback != nullptr) {
+        LOG(ERROR, horovod_global.controller->GetRank()) << "Call Callback for " << e.tensor_name;
         e.callback(status);
       }
     }
