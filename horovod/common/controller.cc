@@ -84,13 +84,6 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
   std::deque<Request> message_queue_tmp;
   tensor_queue_.PopMessagesFromQueue(message_queue_tmp);
   for (auto& message : message_queue_tmp) {
-    std::cout << "===============>LocalRank:" << local_rank_
-      << " RequestRank: " << message.request_rank()
-      << " RequestType: " << message.request_type()
-      << " DataType: " << message.tensor_type()
-      << " TensorName: " << message.tensor_name()
-      << " RootRank: " << message.root_rank()
-      << " Device: " << message.device() << std::endl;
     if (message.request_type() == Request::JOIN) {
       state.joined = true;
       cache_coordinator.set_uncached_in_queue(true);
@@ -130,7 +123,6 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
   bool should_shut_down = shut_down;
 
   // Check for stalled tensors.
-  /** (tmxu) Removed
   if (stall_inspector_.ShouldPerformCheck()) {
     if (is_coordinator_) {
       should_shut_down |= stall_inspector_.CheckForStalledTensors(size_);
@@ -141,7 +133,7 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
     }
     stall_inspector_.UpdateCheckTime();
   }
-  */
+
   cache_coordinator.set_should_shut_down(should_shut_down);
 
   if (response_cache_.capacity() > 0) {
@@ -255,15 +247,11 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
     std::vector<RequestList> fake_allreduce_ready_list(size_);
     if (is_coordinator_) {
       LOG(TRACE) << "Adding messages from rank 0";
-      if (!message_queue_tmp.empty()) {
-        LOG(ERROR) << "Adding messages from rank 0";
-      }
       
       while (!message_queue_tmp.empty()) {
         // Pop the first available message
         Request message = message_queue_tmp.front();
         message_queue_tmp.pop_front();
-        LOG(ERROR, local_rank_) << "Adding messages from rank 0 :" << message.tensor_name();
         if (message.request_type() == Request::JOIN) {
           state.joined_size++;
           continue;
@@ -278,7 +266,7 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
         }
 
         if (message.request_type() == Request::ALLREDUCE) {
-          LOG(ERROR, local_rank_) << "Create Fake Message";
+          // (tmxu) Create fake allreduce-ready messages
           for (int i = 1; i < size_; ++i) {
             Request request;
             request.set_request_rank(i);
@@ -301,16 +289,12 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
       RecvReadyTensors(ready_to_reduce, ready_list);
 
       // (tmxu) Merge negotiated ready_list and 
-      //if (to_allreduce_) {
-        // (tmxu) append fake messages
-      //  ready_list.emplace_back();
-        for (int i = 1; i < size_; ++i) {
-          for (Request req : fake_allreduce_ready_list[i].requests()) {
-            ready_list[i].emplace_request(std::move(req));
-          }
-          // ready_list.push_back(std::move(fake_allreduce_ready_list[i]));
+
+      for (int i = 1; i < size_; ++i) {
+        for (Request req : fake_allreduce_ready_list[i].requests()) {
+          ready_list[i].emplace_request(std::move(req));
         }
-      //}
+      }
 
       // Process messages.
       for (int i = 1; i < size_; ++i) {
@@ -446,13 +430,6 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
       response_list.set_shutdown(should_shut_down);
 
       // Broadcast final results to other ranks.
-      if (response_list.responses().size() > 0) {
-        std::cout << " ===========>SendFinalTensors Local Rank: " << local_rank_ << std::endl;
-        for (Response resp : response_list.responses()) {
-          std::cout << " SendFinalTensors" << resp.tensor_names_string() << std::endl;
-        }
-      }
-
       SendFinalTensors(response_list);
 
     } else {
@@ -498,7 +475,6 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
 
   // Reassign cache bits based on current cache order.
   response_cache_.update_cache_bits();
-  // LOG(ERROR) << "Return from compute from list";
   return response_list;
 }
 
@@ -961,9 +937,7 @@ void Controller::FuseResponses(std::deque<Response>& responses,
         skipped_responses.pop_back();
       }
     }
-    for (auto& name : response.tensor_names()) {
-      LOG(ERROR) << "Created response: " << name;
-    }
+
     response_list.add_response(std::move(response));
     LOG(TRACE) << "Created response of size " << tensor_size;
   }

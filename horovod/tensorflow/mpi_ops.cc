@@ -409,7 +409,6 @@ public:
         [context, done](const common::Status& status) {
           context->SetStatus(ConvertStatus(status));
           done();
-          std::cout << "~~~~~~~~~~~~~~~~~~~~~~~> Finish AllReduce : " << ConvertStatus(status) << std::endl; 
         }, reduce_op, (double) prescale_factor_, (double) postscale_factor_);
     OP_REQUIRES_OK_ASYNC(context, ConvertStatus(enqueue_result), done);
   }
