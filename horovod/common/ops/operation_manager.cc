@@ -16,7 +16,6 @@
 // =============================================================================
 
 #include "operation_manager.h"
-#include <iostream>
 
 namespace horovod {
 namespace common {

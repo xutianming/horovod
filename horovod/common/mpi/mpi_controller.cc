@@ -148,7 +148,6 @@ void MPIController::RecvReadyTensors(std::vector<std::string>& ready_to_reduce,
   delete[] recvcounts;
   delete[] displcmnts;
   delete[] buffer;
-
 }
 
 void MPIController::SendFinalTensors(ResponseList& response_list) {

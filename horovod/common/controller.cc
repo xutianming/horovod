@@ -247,11 +247,11 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
     std::vector<RequestList> fake_allreduce_ready_list(size_);
     if (is_coordinator_) {
       LOG(TRACE) << "Adding messages from rank 0";
-      
       while (!message_queue_tmp.empty()) {
         // Pop the first available message
         Request message = message_queue_tmp.front();
         message_queue_tmp.pop_front();
+
         if (message.request_type() == Request::JOIN) {
           state.joined_size++;
           continue;
@@ -288,8 +288,7 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
       // Receive ready tensors from other ranks
       RecvReadyTensors(ready_to_reduce, ready_list);
 
-      // (tmxu) Merge negotiated ready_list and 
-
+      // (tmxu) Merge negotiated ready_list and fake allreduce ready message
       for (int i = 1; i < size_; ++i) {
         for (Request req : fake_allreduce_ready_list[i].requests()) {
           ready_list[i].emplace_request(std::move(req));
@@ -318,7 +317,6 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
         }
         if (received_message_list.shutdown()) {
           // Received SHUTDOWN request from one of the workers.
-          LOG(ERROR, local_rank_) << "Setting should shutdown to true";
           should_shut_down = true;
         }
       }
@@ -443,8 +441,10 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
         }
         message_queue_tmp.pop_front();
       }
+
       // Send ready tensors to rank zero
       SendReadyTensors(message_list);
+
       // Receive final tensors to be processed from rank zero
       RecvFinalTensors(response_list);
     }
@@ -475,6 +475,7 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
 
   // Reassign cache bits based on current cache order.
   response_cache_.update_cache_bits();
+
   return response_list;
 }
 

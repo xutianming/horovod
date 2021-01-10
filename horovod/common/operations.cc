@@ -604,7 +604,6 @@ bool RunLoopOnce(HorovodGlobalState& state) {
   auto response_list =
       state.controller->ComputeResponseList(horovod_global.shut_down, state);
 
-
   state.mark_cycles_in_timeline =
       state.controller->MarkCyclesInTimelinePending();
 
@@ -612,7 +611,6 @@ bool RunLoopOnce(HorovodGlobalState& state) {
   int64_t total_tensor_size = 0;
   std::vector<std::string> tensor_names;
   if (state.parameter_manager.IsAutoTuning()) {
-    LOG(ERROR, state.controller->GetRank()) << " GetTensorDataForAutotuner" << std::endl;
     total_tensor_size = horovod_global.tensor_queue.GetTensorDataForAutotuner(
         response_list, tensor_names);
   }
@@ -620,7 +618,6 @@ bool RunLoopOnce(HorovodGlobalState& state) {
   // Perform the collective operation. All nodes should end up performing
   // the same operation.
   int rank = state.controller->GetRank();
-
   for (auto& response : response_list.responses()) {
     if (!state.group_table.empty()) {
       // Deregister any completed groups
