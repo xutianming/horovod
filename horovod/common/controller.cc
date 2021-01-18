@@ -141,7 +141,7 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
     // determine if any worker has uncached messages in queue or requests
     // a shutdown. This function removes any invalid cache entries, if they
     // exist.
-    CoordinateCacheAndState(cache_coordinator, local_rank_);
+    CoordinateCacheAndState(cache_coordinator);
     // Remove uncommon cached tensors from queue and replace to state
     // queue for next cycle. Skip adding common cached tensors to
     // queue as they are handled separately.
@@ -468,7 +468,7 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
            response.response_type() == Response::ResponseType::ADASUM ||
            response.response_type() == Response::ResponseType::ALLTOALL) &&
           (int)response.devices().size() == size_) {
-        response_cache_.put(response, tensor_queue_, state.joined, local_rank_);
+        response_cache_.put(response, tensor_queue_, state.joined);
       }
     }
   }
@@ -778,14 +778,14 @@ Response Controller::ConstructResponse(const std::string& name, int joined_size)
   return response;
 }
 
-void Controller::CoordinateCacheAndState(CacheCoordinator& cache_coordinator, int rank) {
+void Controller::CoordinateCacheAndState(CacheCoordinator& cache_coordinator) {
   // Sync cache and state information across workers.
   cache_coordinator.sync(shared_from_this(), timeline_enabled_);
 
   // If invalid cache entries exist, erase associated entries.
   if (!cache_coordinator.invalid_bits().empty()) {
     for (auto bit : cache_coordinator.invalid_bits()) {
-      response_cache_.erase_response(bit, rank);
+      response_cache_.erase_response(bit);
     }
   }
 

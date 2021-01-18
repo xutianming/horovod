@@ -63,7 +63,7 @@ public:
                     bool joined = false) const;
 
   void put(const Response& response, TensorQueue& tensor_queue,
-           bool joined = false, int rank = 0);
+           bool joined = false);
 
   const Response& get_response(uint32_t cache_bit);
 
@@ -75,7 +75,7 @@ public:
 
   std::vector<uint32_t> list_all_bits() const;
 
-  void erase_response(uint32_t cache_bit, int rank);
+  void erase_response(uint32_t cache_bit);
 
   void update_cache_bits();
 

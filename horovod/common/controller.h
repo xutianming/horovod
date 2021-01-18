@@ -162,7 +162,7 @@ protected:
   // Routine to sync cache hit and invalid bit sets across workers.
   // Also determines global shutdown state and whether uncached requests
   // exist on any worker.
-  void CoordinateCacheAndState(CacheCoordinator& cache_coordinator, int rank);
+  void CoordinateCacheAndState(CacheCoordinator& cache_coordinator);
 
   void FuseResponses(std::deque<Response>& responses,
                      HorovodGlobalState& state,
