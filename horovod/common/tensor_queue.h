@@ -29,8 +29,8 @@ class TensorQueue {
 public:
   TensorQueue() = default;
   TensorQueue(const TensorQueue&) = delete;
-  Status AddToTensorQueue(TensorTableEntry& e, Request& message);
-  Status AddToTensorQueueMulti(std::vector<TensorTableEntry>& entries, std::vector<Request>& messages);
+  Status AddToTensorQueue(TensorTableEntry& e, Request& message, int rank);
+  Status AddToTensorQueueMulti(std::vector<TensorTableEntry>& entries, std::vector<Request>& messages, int rank);
 
   void FinalizeTensorQueue(std::vector<StatusCallback>& callbacks_buffer);
 
@@ -39,9 +39,11 @@ public:
 
   void GetTensorEntriesFromResponse(const Response& response,
                                     std::vector<TensorTableEntry>& entries,
-                                    bool joined = false);
+                                    bool joined = false, int rank = 0);
 
   const TensorTableEntry& GetTensorEntry(const std::string& tensor_name) const;
+
+  bool CheckTensorEntry(const std::string& tensor_name);
 
   void PopMessagesFromQueue(std::deque<Request>& message_queue_buffer);
 

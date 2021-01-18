@@ -255,7 +255,7 @@ void PerformOperation(Response response, HorovodGlobalState& state) {
   auto& timeline = horovod_global.timeline;
   if (response.response_type() != Response::JOIN) {
     horovod_global.tensor_queue.GetTensorEntriesFromResponse(response, entries,
-                                                             state.joined);
+                                                             state.joined, horovod_global.controller->GetRank());
 
     for (auto& e : entries) {
       timeline.Start(e.tensor_name, response.response_type());
@@ -603,6 +603,15 @@ bool RunLoopOnce(HorovodGlobalState& state) {
 
   auto response_list =
       state.controller->ComputeResponseList(horovod_global.shut_down, state);
+
+  // (tmxu) Check every tensor in response list is ready
+  for (auto& response : response_list.responses()) {
+    for (std::string name : response.tensor_names()) {
+      while (! horovod_global.tensor_queue.CheckTensorEntry(name)) {
+        std::this_thread::sleep_for(sleep_duration);
+      }
+    }
+  }
 
   state.mark_cycles_in_timeline =
       state.controller->MarkCyclesInTimelinePending();
@@ -1015,7 +1024,7 @@ Status EnqueueTensorAllreduces(std::vector<std::shared_ptr<OpContext>>& contexts
   if (horovod_global.shut_down) {
     return SHUT_DOWN_ERROR;
   }
-  status = horovod_global.tensor_queue.AddToTensorQueueMulti(entries, messages);
+  status = horovod_global.tensor_queue.AddToTensorQueueMulti(entries, messages, horovod_global.controller->GetRank());
 
   return status;
 }
@@ -1048,7 +1057,7 @@ Status EnqueueTensorAllgather(std::shared_ptr<OpContext> context,
   if (horovod_global.shut_down) {
     return SHUT_DOWN_ERROR;
   }
-  Status status = horovod_global.tensor_queue.AddToTensorQueue(e, message);
+  Status status = horovod_global.tensor_queue.AddToTensorQueue(e, message, horovod_global.controller->GetRank());
   if (status.ok()) {
     LOG(TRACE, horovod_global.controller->GetRank()) << "Enqueued " << name;
   }
@@ -1087,7 +1096,7 @@ Status EnqueueTensorBroadcast(std::shared_ptr<OpContext> context,
   if (horovod_global.shut_down) {
     return SHUT_DOWN_ERROR;
   }
-  Status status = horovod_global.tensor_queue.AddToTensorQueue(e, message);
+  Status status = horovod_global.tensor_queue.AddToTensorQueue(e, message, horovod_global.controller->GetRank());
   if (status.ok()) {
     LOG(TRACE, horovod_global.controller->GetRank()) << "Enqueued " << name;
   }
@@ -1152,7 +1161,7 @@ Status EnqueueTensorAlltoall(std::shared_ptr<OpContext> context,
   if (horovod_global.shut_down) {
     return SHUT_DOWN_ERROR;
   }
-  Status status = horovod_global.tensor_queue.AddToTensorQueue(e, message);
+  Status status = horovod_global.tensor_queue.AddToTensorQueue(e, message, horovod_global.controller->GetRank());
   if (status.ok()) {
     LOG(TRACE, horovod_global.controller->GetRank()) << "Enqueued " << name;
   }
@@ -1180,7 +1189,7 @@ Status EnqueueJoin(std::shared_ptr<OpContext> context,
   if (horovod_global.shut_down) {
     return SHUT_DOWN_ERROR;
   }
-  Status status = horovod_global.tensor_queue.AddToTensorQueue(e, message);
+  Status status = horovod_global.tensor_queue.AddToTensorQueue(e, message, horovod_global.controller->GetRank());
   if (status.ok()) {
     LOG(TRACE, horovod_global.controller->GetRank()) << "Enqueued " << name;
   }

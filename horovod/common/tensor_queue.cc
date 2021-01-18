@@ -24,7 +24,7 @@ namespace horovod {
 namespace common {
 
 // Add a TensorTableEntry as well as its message to the queue.
-Status TensorQueue::AddToTensorQueue(TensorTableEntry& e, Request& message) {
+Status TensorQueue::AddToTensorQueue(TensorTableEntry& e, Request& message, int rank) {
   std::lock_guard<std::mutex> guard(mutex_);
   if (tensor_table_.find(e.tensor_name) != tensor_table_.end()) {
     return DUPLICATE_NAME_ERROR;
@@ -35,7 +35,7 @@ Status TensorQueue::AddToTensorQueue(TensorTableEntry& e, Request& message) {
 }
 
 Status TensorQueue::AddToTensorQueueMulti(std::vector<TensorTableEntry>& entries,
-                                          std::vector<Request>& messages) {
+                                          std::vector<Request>& messages, int rank) {
   std::lock_guard<std::mutex> guard(mutex_);
 
   for (int i = 0; i < entries.size(); ++i) {
@@ -85,7 +85,7 @@ TensorQueue::GetTensorDataForAutotuner(const ResponseList& response_list,
 // tensor entries.
 void TensorQueue::GetTensorEntriesFromResponse(
     const Response& response, std::vector<TensorTableEntry>& entries,
-    bool joined) {
+    bool joined, int rank) {
   // Reserve to save re-allocation costs, as we know the size before.
   entries.reserve(response.tensor_names().size());
   {
@@ -139,6 +139,12 @@ TensorQueue::GetTensorEntry(const std::string& tensor_name) const{
   auto& iter = tensor_table_.at(tensor_name);
 
   return iter;
+}
+
+bool TensorQueue::CheckTensorEntry(const std::string& tensor_name) {
+  // Lock on the tensor table.
+  std::lock_guard<std::mutex> guard(mutex_);
+  return tensor_table_.find(tensor_name) != tensor_table_.end();
 }
 
 // Pop out all the messages from the queue

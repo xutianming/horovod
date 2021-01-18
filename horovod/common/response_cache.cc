@@ -157,7 +157,7 @@ void ResponseCache::put_(const Response& response, TensorParams& params, bool jo
 
 }
 
-void ResponseCache::put(const Response& response, TensorQueue& tensor_queue, bool joined) {
+void ResponseCache::put(const Response& response, TensorQueue& tensor_queue, bool joined, int rank) {
   // Note: This method invalidates all previously returned cache bit positions
   // if evictions occur.
 
@@ -168,7 +168,7 @@ void ResponseCache::put(const Response& response, TensorQueue& tensor_queue, boo
   std::vector<TensorTableEntry> entries_for_join;
   if (joined) {
     tensor_queue.GetTensorEntriesFromResponse(response, entries_for_join,
-                                              joined);
+                                              joined, rank);
   }
 
   // If response is fused, split back into individual responses
@@ -196,15 +196,17 @@ void ResponseCache::put(const Response& response, TensorQueue& tensor_queue, boo
       i++;
     }
   } else {
-    TensorParams params;
-    const auto& tensor_entry =
-        joined ? entries_for_join[0]
-               : tensor_queue.GetTensorEntry(response.tensor_names()[0]);
-    params.device = tensor_entry.device;
-    params.dtype = tensor_entry.tensor->dtype();
-    params.shape = tensor_entry.tensor->shape().to_vector();
+    if (response.tensor_names().size() > 0 && tensor_queue.CheckTensorEntry(response.tensor_names()[0])) {
+      TensorParams params;
+      const auto& tensor_entry =
+          joined ? entries_for_join[0]
+                : tensor_queue.GetTensorEntry(response.tensor_names()[0]);
+      params.device = tensor_entry.device;
+      params.dtype = tensor_entry.tensor->dtype();
+      params.shape = tensor_entry.tensor->shape().to_vector();
 
-    this->put_(response, params, joined);
+      this->put_(response, params, joined);
+    }
   }
 }
 
@@ -244,7 +246,7 @@ std::vector<uint32_t> ResponseCache::list_all_bits() const {
   return result;
 }
 
-void ResponseCache::erase_response(uint32_t cache_bit) {
+void ResponseCache::erase_response(uint32_t cache_bit, int rank) {
   assert(cache_bit < cache_iters_.size());
 
   // Erase entry from iterator at cache_bit position and set
@@ -255,7 +257,9 @@ void ResponseCache::erase_response(uint32_t cache_bit) {
   // function is called.
   auto it = cache_iters_[cache_bit];
   tensor_name_to_bit_.erase(it->first.tensor_names()[0]);
-  cache_.erase(it);
+  if (it != cache_.end()) {
+    cache_.erase(it);
+  }
 
   cache_iters_[cache_bit] = cache_.end();
 

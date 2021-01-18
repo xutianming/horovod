@@ -141,7 +141,7 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
     // determine if any worker has uncached messages in queue or requests
     // a shutdown. This function removes any invalid cache entries, if they
     // exist.
-    CoordinateCacheAndState(cache_coordinator);
+    CoordinateCacheAndState(cache_coordinator, local_rank_);
     // Remove uncommon cached tensors from queue and replace to state
     // queue for next cycle. Skip adding common cached tensors to
     // queue as they are handled separately.
@@ -265,7 +265,7 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
           ready_to_reduce.push_back(message.tensor_name());
         }
 
-        if (message.request_type() == Request::ALLREDUCE) {
+        if (message.request_type() == Request::ALLREDUCE || message.request_type() == Request::ALLTOALL) {
           // (tmxu) Create fake allreduce-ready messages
           for (int i = 1; i < size_; ++i) {
             Request request;
@@ -434,7 +434,7 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
       RequestList message_list;
       message_list.set_shutdown(should_shut_down);
       while (!message_queue_tmp.empty()) {
-        if (message_queue_tmp.front().request_type() == Request::ALLREDUCE) {
+        if (message_queue_tmp.front().request_type() == Request::ALLREDUCE || message_queue_tmp.front().request_type() == Request::ALLTOALL) {
           // Do nothing
         } else {
           message_list.add_request(message_queue_tmp.front());
@@ -468,7 +468,7 @@ ResponseList Controller::ComputeResponseList(std::atomic_bool& shut_down,
            response.response_type() == Response::ResponseType::ADASUM ||
            response.response_type() == Response::ResponseType::ALLTOALL) &&
           (int)response.devices().size() == size_) {
-        response_cache_.put(response, tensor_queue_, state.joined);
+        response_cache_.put(response, tensor_queue_, state.joined, local_rank_);
       }
     }
   }
@@ -778,14 +778,14 @@ Response Controller::ConstructResponse(const std::string& name, int joined_size)
   return response;
 }
 
-void Controller::CoordinateCacheAndState(CacheCoordinator& cache_coordinator) {
+void Controller::CoordinateCacheAndState(CacheCoordinator& cache_coordinator, int rank) {
   // Sync cache and state information across workers.
   cache_coordinator.sync(shared_from_this(), timeline_enabled_);
 
   // If invalid cache entries exist, erase associated entries.
   if (!cache_coordinator.invalid_bits().empty()) {
     for (auto bit : cache_coordinator.invalid_bits()) {
-      response_cache_.erase_response(bit);
+      response_cache_.erase_response(bit, rank);
     }
   }
 
